@@ -1,0 +1,641 @@
+{
+  "name": "Ai Code Buddy",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "### Chat trigger Node\n\nIt allows me to interact with my agent using the natural language.\n",
+        "height": 256,
+        "width": 320,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -480,
+        -144
+      ],
+      "typeVersion": 1,
+      "id": "e0d8c4d2-db6e-4a42-8598-efae26a1205d",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        -368,
+        -32
+      ],
+      "id": "4b560998-cea1-49c5-b5eb-e67949099208",
+      "name": "Chat trigger",
+      "webhookId": "b66da08a-6b38-461d-8412-47054b1826c0"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are the Orchestrator Agent of AI Code Buddy. Your responsibility is to understand the user's request, delegate tasks to the appropriate specialized agents, coordinate their results, and provide an accurate final response.\n\n## Available Agents\n\n1. GitHub Agent: Explores GitHub repositories, retrieves repository metadata, lists files, reads file contents, and obtains directory structures.\n2. Storage & Delivery Agent: Creates Markdown files, creates Google Docs, updates existing Google Docs, and sends emails.\n\n## Core Workflow\n\n1. Understand exactly what the user wants.\n2. Determine which agent or agents are needed.\n3. For repository-related requests, call the GitHub Agent with the repository owner, repository name, requested files, and other relevant requirements.\n4. Review the GitHub Agent's response and use its actual returned data.\n5. If the user requests saving or delivery, pass the relevant verified content and instructions to the Storage & Delivery Agent.\n6. If the user requests both repository analysis and document creation, retrieve and analyze the repository information before asking the Storage & Delivery Agent to create the document.\n7. Return a clear response describing the result and any available links or relevant details.\n\n## Delegation Rules\n\n- Repository exploration, file listing, code retrieval, repository metadata, and directory trees: GitHub Agent.\n- Creating a Markdown file: Storage & Delivery Agent.\n- Creating a new Google Docs document: Storage & Delivery Agent.\n- Updating an existing Google Docs document: Storage & Delivery Agent.\n- Sending an email: Storage & Delivery Agent.\n- Requests involving multiple operations: coordinate the agents in the correct order.\n- General questions that do not require either agent: answer directly when possible.\n\n## Important Rules\n\n- Do not call an agent when it is unnecessary.\n- Do not assume an agent succeeded just because it was called.\n- Check the returned result before continuing to the next step.\n- Never invent repository information, file contents, document links, document IDs, or email delivery confirmations.\n- Do not send emails unless the user explicitly requests email delivery.\n- Do not update or overwrite existing documents unless the user requests it.\n- If required information is missing, ask a concise clarifying question.\n- If a tool fails, communicate the actual failure and do not pretend the task is complete.\n- Pass relevant content between agents without unnecessarily shortening or omitting important information.\n\n## Final Response\n\nRespond concisely and accurately. State what was completed, provide document links or IDs when available, and explain any operation that could not be completed."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        64,
+        -160
+      ],
+      "id": "c33d7961-fd5f-4395-a191-38fd556e63d4",
+      "name": "Orchestrator Agent"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        0
+      ],
+      "id": "176d2a0d-6c32-4dcb-81ca-3f79feba2fa8",
+      "name": "Orchestrator Model",
+      "credentials": {
+        "groqApi": {
+          "id": "QGmtW3Ts2OSyOdqM",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        48,
+        -16
+      ],
+      "id": "1379724c-5e4b-4828-bbd9-84cd2e8801e0",
+      "name": "Orchestrator Memory"
+    },
+    {
+      "parameters": {
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "options": {
+          "systemMessage": "You are the Storage & Delivery Agent of AI Code Buddy. Your responsibility is to save, organize, update, or deliver content according to the user's explicit request and the instructions supplied by the Orchestrator Agent.\n\n## Available Tools\n\nUse the tools connected to your Tool port:\n\n- Send a message in Gmail: Sends an email.\n- Create Docs: Creates a new Google Docs document.\n- Update Docs: Updates an existing Google Docs document.\n- Create Markdown: Creates a Markdown file on Google Drive.\n\nFollow each tool's configured parameters and description. Do not assume a tool supports inputs or actions that are not configured.\n\n## Tool Selection\n\n1. When the user requests a new Google Docs document, use Create Docs.\n2. When the user requests changes to an existing Google Docs document, use Update Docs with the correct document ID and requested content.\n3. When the user requests a Markdown file, use Create Markdown.\n4. When the user explicitly requests email delivery, use Send a message in Gmail.\n5. When the user requests multiple operations, perform only the operations necessary to satisfy the request.\n\n## Content Requirements\n\n- Use the content provided by the Orchestrator Agent or returned by another relevant tool.\n- Preserve important information, technical details, code, filenames, and repository paths.\n- Use a clear document structure with headings, lists, and code blocks where appropriate.\n- Do not invent missing content or claim that repository information was verified if it was not.\n- Do not silently replace important content with a short summary when the user requested the full content.\n- Do not update or overwrite an existing document unless explicitly requested.\n- Do not create duplicate documents unnecessarily when an existing document was intended to be updated.\n\n## Email Requirements\n\n- Send email only when the user explicitly requests it.\n- Ensure the recipient field contains a valid email address, not a name, label, or full sentence.\n- Use the correct content and recipient supplied by the Orchestrator Agent.\n- If the recipient address or essential content is missing, ask the Orchestrator Agent for clarification rather than guessing.\n- Never claim an email was sent unless the Gmail tool confirms success.\n\n## Execution and Error Handling\n\n- Execute the appropriate tool and inspect its actual output.\n- Do not claim success merely because a tool was called.\n- If a required document ID, title, recipient, or content is missing, request the missing information.\n- If a tool fails, return the actual error to the Orchestrator Agent.\n- Retry only when the cause is understood and retrying is safe.\n- Return any available document URL, document ID, or delivery confirmation from the tool output.\n- Never invent links, IDs, or confirmations.\n\n## Output to the Orchestrator\n\nReturn:\n1. The operation performed.\n2. Whether it succeeded or failed.\n3. The document title and URL or ID, when available.\n4. The email recipient and confirmed delivery status, if applicable.\n5. Any unresolved errors or limitations.\n\nDo not explore GitHub repositories directly. The GitHub Agent is responsible for repository retrieval."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
+      "position": [
+        512,
+        320
+      ],
+      "id": "12541353-ee48-467e-8bc5-e78b005e6f5a",
+      "name": "Storage & Delivery Agent"
+    },
+    {
+      "parameters": {
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "options": {
+          "systemMessage": "You are the GitHub Agent of AI Code Buddy. Your job is to explore GitHub repositories and return accurate, useful information to the Orchestrator Agent.\n\n## Available Tools\n\nUse the tools connected to your Tool port:\n\n- List files: Lists files in a repository or the configured path.\n- Get file: Retrieves the contents of a specified file.\n- Get repo: Retrieves repository metadata, such as its description, stars, and forks.\n- getRepoTree: Retrieves a repository's directory structure, including files and folders, when the configured workflow supports it.\n\nUse each tool according to its configured inputs and description.\n\n## Tool Selection\n\n1. When the user requests repository metadata, use Get repo.\n2. When the user requests a list of files, use List files.\n3. When the user requests the complete repository directory tree, prefer getRepoTree.\n4. When the user asks to inspect, explain, or summarize a particular file, use Get file with the correct file path.\n5. When the request requires several kinds of information, use the minimum number of tools needed to fulfill it accurately.\n\n## Repository Identification\n\n- Identify the repository owner and repository name from the supplied inputs or user request.\n- Pass the correct owner and repository name to the selected tool.\n- If the repository cannot be identified confidently, ask the Orchestrator Agent for clarification.\n- Do not substitute a different repository without permission.\n\n## Directory Tree Requirements\n\n- Preserve repository paths and filenames exactly as returned.\n- Distinguish a complete directory tree from a partial file listing.\n- Do not describe a list of files from one folder as the complete repository tree.\n- If getRepoTree returns a tree containing file and folder metadata, use the actual returned structure.\n- If a tool returns only inputs or repository identifiers rather than the expected file data, do not treat those inputs as the directory tree.\n- If the repository is too large to return fully, clearly state the limitation.\n\n## Accuracy and Error Handling\n\n- Never fabricate repository information, file paths, file contents, or metadata.\n- Inspect the actual tool output before reporting success.\n- If a tool fails, report the failure and its useful details to the Orchestrator Agent.\n- If no files are returned, distinguish an empty result from an execution error.\n- Do not claim that a file has been read unless its content was actually returned.\n\n## Output to the Orchestrator\n\nReturn:\n1. Repository owner and name.\n2. The requested metadata, file listing, directory tree, or file contents.\n3. A concise summary when useful.\n4. Any errors, missing information, or limitations.\n\nReturn enough actual data for the Orchestrator Agent to answer the user or pass the content to the Storage & Delivery Agent.\n\nDo not create documents, update documents, or send emails. Those tasks belong to the Storage & Delivery Agent."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
+      "position": [
+        -208,
+        336
+      ],
+      "id": "8dc23868-2d33-46d0-b57c-6ac47949ac00",
+      "name": "Github Agent"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-120b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -384,
+        496
+      ],
+      "id": "1b4fde1d-4cba-4475-8f63-d3223dc47bff",
+      "name": "Github model",
+      "credentials": {
+        "groqApi": {
+          "id": "QGmtW3Ts2OSyOdqM",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        -224,
+        496
+      ],
+      "id": "e674d974-bbcb-40a7-b851-e1eb2f7fb8e0",
+      "name": "Github Memory"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "list",
+        "owner": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Repository_Owner', ``, 'string') }}"
+        },
+        "repository": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Repository_Name', ``, 'string') }}"
+        },
+        "filePath": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Path', ``, 'string') }}"
+      },
+      "type": "n8n-nodes-base.githubTool",
+      "typeVersion": 1.1,
+      "position": [
+        -224,
+        752
+      ],
+      "id": "759237ac-9391-4dc1-88c9-3a867e4fcfad",
+      "name": "List files",
+      "webhookId": "86216845-0698-488b-b78d-7bde6ec97add",
+      "credentials": {
+        "githubApi": {
+          "id": "gzUNKIRroY2zajXQ",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "owner": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Repository_Owner', ``, 'string') }}"
+        },
+        "repository": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Repository_Name', ``, 'string') }}"
+        },
+        "filePath": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('File_Path', ``, 'string') }}",
+        "asBinaryProperty": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('As_Binary_Property', ``, 'boolean') }}",
+        "additionalParameters": {}
+      },
+      "type": "n8n-nodes-base.githubTool",
+      "typeVersion": 1.1,
+      "position": [
+        -96,
+        752
+      ],
+      "id": "39bde2a9-8dc5-4358-808e-a57dacfb00a7",
+      "name": "Get file",
+      "webhookId": "86b7243c-9975-4580-b126-3aaf0901d3e6",
+      "credentials": {
+        "githubApi": {
+          "id": "gzUNKIRroY2zajXQ",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "repository",
+        "operation": "get",
+        "owner": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Repository_Owner', ``, 'string') }}"
+        },
+        "repository": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Repository_Name', ``, 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.githubTool",
+      "typeVersion": 1.1,
+      "position": [
+        32,
+        752
+      ],
+      "id": "06712e96-6be2-4c39-a311-047475c140a0",
+      "name": "Get repo",
+      "webhookId": "b8987f24-b032-458c-8b0b-cdd7a2e05282",
+      "credentials": {
+        "githubApi": {
+          "id": "gzUNKIRroY2zajXQ",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentURL": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Doc_ID_or_URL', ``, 'string') }}",
+        "simple": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Simplify', ``, 'boolean') }}",
+        "actionsUi": {
+          "actionFields": [
+            {
+              "action": "insert",
+              "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('actionFields0_Old_Text', ``, 'string') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDocsTool",
+      "typeVersion": 2,
+      "position": [
+        768,
+        720
+      ],
+      "id": "77467c9d-2282-4425-a064-8d0ca1e067a3",
+      "name": "Update Docs",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "nzm5eyIIlOGXKRQm",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "folderId": "default",
+        "title": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Title', ``, 'string') }}"
+      },
+      "type": "n8n-nodes-base.googleDocsTool",
+      "typeVersion": 2,
+      "position": [
+        608,
+        720
+      ],
+      "id": "5b27db25-36c9-43ed-92dc-f3413c7383dd",
+      "name": "Create Docs",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "nzm5eyIIlOGXKRQm",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "createFromText",
+        "content": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('File_Content', ``, 'string') }}",
+        "name": "code buddy.md",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "root",
+          "mode": "list",
+          "cachedResultName": "/ (Root folder)",
+          "cachedResultUrl": "https://drive.google.com/drive"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDriveTool",
+      "typeVersion": 3,
+      "position": [
+        928,
+        720
+      ],
+      "id": "729861e6-be54-4b07-8e24-bd0c121f4e72",
+      "name": "Create Markdown",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "lI5WnGbwE7WeZ0I5",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('To', ``, 'string') }}",
+        "subject": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Subject', ``, 'string') }}",
+        "message": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Message', ``, 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.2,
+      "position": [
+        432,
+        720
+      ],
+      "id": "68028af1-ec2e-44f2-b9b5-b16bbcae353e",
+      "name": "Send a message in Gmail",
+      "webhookId": "ed730504-01d1-4977-961a-91649fd6e7bf",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "yWgm7w8cjzRhEAZn",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "whisper-large-v3-turbo",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        288,
+        480
+      ],
+      "id": "1838e553-f99c-41ae-a300-e83966da94a5",
+      "name": "Doc Model",
+      "credentials": {
+        "groqApi": {
+          "id": "QGmtW3Ts2OSyOdqM",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        432,
+        480
+      ],
+      "id": "801c096d-974c-45cb-922d-73e2be9d619a",
+      "name": "DocMemory"
+    },
+    {
+      "parameters": {
+        "description": "This tool will give the complete directory tree of the repo as a json object, will list down all the files that are there on the repo",
+        "workflowId": {
+          "__rl": true,
+          "value": "fb763iDfcUZDMAzX",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/fb763iDfcUZDMAzX",
+          "cachedResultName": "getRepoTree Tool"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Owner": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Owner', ``, 'string') }}",
+            "Repo_Name": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Repo_Name', ``, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Owner",
+              "displayName": "Owner",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Repo_Name",
+              "displayName": "Repo_Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        160,
+        752
+      ],
+      "id": "082dde3f-daff-44f0-b44b-47d711657206",
+      "name": "getRepoTree"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Chat trigger": {
+      "main": [
+        [
+          {
+            "node": "Orchestrator Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Orchestrator Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Orchestrator Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Orchestrator Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Orchestrator Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Storage & Delivery Agent": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrator Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Github Agent": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrator Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Github model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Github Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Github Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Github Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List files": {
+      "ai_tool": [
+        [
+          {
+            "node": "Github Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get file": {
+      "ai_tool": [
+        [
+          {
+            "node": "Github Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get repo": {
+      "ai_tool": [
+        [
+          {
+            "node": "Github Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Docs": {
+      "ai_tool": [
+        [
+          {
+            "node": "Storage & Delivery Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Docs": {
+      "ai_tool": [
+        [
+          {
+            "node": "Storage & Delivery Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Markdown": {
+      "ai_tool": [
+        [
+          {
+            "node": "Storage & Delivery Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message in Gmail": {
+      "ai_tool": [
+        [
+          {
+            "node": "Storage & Delivery Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Doc Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Storage & Delivery Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DocMemory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Storage & Delivery Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "getRepoTree": {
+      "ai_tool": [
+        [
+          {
+            "node": "Github Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "031ebdf4-8fc9-40b4-86ae-cfedf460ba2c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9dba3d84e064b2a53c5b04da2bd4d8ae228504f99e7a006d2d328f68d1f232aa"
+  },
+  "nodeGroups": [],
+  "id": "UzPShonk29yAWbn4",
+  "tags": []
+}
